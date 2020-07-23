@@ -28,9 +28,11 @@ var serverAddress = '';
 var iface = os.networkInterfaces();
 for (x in iface) {
   for (y in iface[x]) {
-    if ((iface[x][y].internal != true) &&
-        (iface[x][y].family == 'IPv4')) {
+    //if ((iface[x][y].internal != true) &&
+    //    (iface[x][y].family == 'IPv4')) {
+    if (x == 'eno1') {
       serverAddress = iface[x][y].address;
+      break;
     }
   }
 }
@@ -76,10 +78,16 @@ function fileScanner(directory) {
       "height"           : height,
       "orientDegree"     : "0",
       "subtitles"        : [],
+      "ratioTypeFor2DScreen":"default",
+      "rotationFor2DScreen":0,
+      "exists":true,
+      "isBadMedia":false,
+      "addedTime":1
     });
-    
+
     mediaDict[id] = {
       "deviceId"         : "???",
+      "actionId":"da06422be98d2fa608731b1296171b8f",
       "command"          : "activePlay",
       "id"               : id,
       "exists"           : true,
@@ -94,6 +102,14 @@ function fileScanner(directory) {
       "width"            : width,
       "height"           : height,
       "orientDegree"     : "0",
+      "ratioTypeFor2DScreen":"default",
+      "rotationFor2DScreen":0,
+      "speed":"1",
+      "abLoopPointA":-1,
+      "abLoopPointB":-1,
+      "randomMode":"order",
+      "loopMode":"playlist",
+      "randomPlaylist":[],
       "url"              : "http://" + serverAddress + ":" + serverWebPort + "/stream/" + id,
     };
   }
@@ -141,13 +157,15 @@ io.on('connection', function(socket) {
         "command"    : "addDeviceResult",
         "success"    : true,
         "isLoggedIn" : true,
+        "version"    : "10",
+        "os"         : "win"
       };
       socket.emit('serverMessage', reply);
       console.log("Device connected: " + JSON.parse(message).deviceName);
       break;
 
     case "getPlayerState":
-      reply = { 
+      reply = {
         "command"          : "updatePlayerState",
         "state"            : "stopped",
         "showMirrorScreen" : true,
@@ -155,11 +173,49 @@ io.on('connection', function(socket) {
       socket.emit('serverMessage', reply);
       break;
 
+    case "getPlaylist":
+      var playlist = [];
+      for (var i = 0; i < mediaList.length; i++) {
+        playlist.push(mediaList[i].id);
+      }
+      reply = {
+        "command" : "updatePlaylist",
+        "list"    : playlist
+      };
+      socket.emit('serverMessage', reply);
+      break;
+
     case "getMediaList":
       reply = {
         "command" : "getMediaListResult",
-        "list"    : mediaList,
+        "list"    : mediaList
       };
+      socket.emit('serverMessage', reply);
+      break;
+
+    case "setPlayerSpeed":
+      reply = {
+        "command": "updatePlayerSpeed",
+        "speed": "1",
+        "deviceId": JSON.parse(message).deviceId
+      };
+      socket.emit('serverMessage', reply);
+      break;
+
+    case "setPlayerRandomAndLoopMode":
+      reply = {
+        "command": "updatePlayerRandomAndLoopMode",
+        "randomMode": "order",
+        "loopMode": "playlist",
+        "deviceId": JSON.parse(message).deviceId
+      }
+      socket.emit('serverMessage', reply);
+      reply = {
+        "command": "updatePlayerAbLoop",
+        "pointA": -1,
+        "pointB": -1,
+        "deviceId": JSON.parse(message).deviceId
+      }
       socket.emit('serverMessage', reply);
       break;
 
@@ -170,7 +226,7 @@ io.on('connection', function(socket) {
       break;
 
     case "setTime":
-      reply = { 
+      reply = {
         "deviceId" : JSON.parse(message).deviceId,
         "command"  : "activeSetTime",
         "time"     : JSON.parse(message).time,
@@ -179,7 +235,7 @@ io.on('connection', function(socket) {
       break;
 
     case "stop":
-      reply = { 
+      reply = {
         "deviceId" : JSON.parse(message).deviceId,
         "command"  : "activeStop",
       };
@@ -190,6 +246,12 @@ io.on('connection', function(socket) {
       break;
 
     case "setVRSetting":
+      break;
+
+    case "upgradePriority":
+      break;
+
+    case "refreshMediaList":
       break;
 
     case "disconnect":
@@ -259,7 +321,7 @@ app.get('/stream/:id', function (request, response) {
     if (response.openedFile) {
       response.openedFile.unpipe(this);
       if (this.openedFile.fd) {
-        fs.close(this.openedFile.fd);
+        fs.close(this.openedFile.fd, function(){});
       }
     }
   });
